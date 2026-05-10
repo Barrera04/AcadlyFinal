@@ -33,12 +33,23 @@ export async function create(cursoId: number, payload: any) {
 }
 
 export async function update(id: number, payload: any) {
-  const res = await fetch(`${API_BASE}/horarios/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  return await res.json();
+  try {
+    // Merge with existing to avoid nulls for required fields
+    const existingRes = await fetch(`${API_BASE}/horarios/${id}`);
+    const existingText = await existingRes.text();
+    const existing = existingText ? JSON.parse(existingText) : null;
+    const body = { ...(existing || {}), ...payload };
+
+    const res = await fetch(`${API_BASE}/horarios/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  } catch (e) {
+    return { error: 'update failed' };
+  }
 }
 
 export async function remove(id: number) {

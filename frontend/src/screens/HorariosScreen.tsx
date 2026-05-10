@@ -1,26 +1,59 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, FlatList } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { theme } from '../styles/theme';
 import Card from '../components/Card';
+import FloatingButton from '../components/FloatingButton';
 import * as horariosService from '../services/horariosService';
 import * as cursosService from '../services/cursosService';
+import * as courseState from '../services/courseStateService';
 import { useAuth } from '../context/AuthContext';
 import { showMessage } from '../utils/notify';
 
 export default function HorariosScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [horarios, setHorarios] = useState<any[]>([]);
   const [cursos, setCursos] = useState<any[]>([]);
+  const [activeMap, setActiveMap] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [form, setForm] = useState({ id: null as any, dia: 'Lun', horaInicio: '08:00', horaFin: '09:30', aula: '', cursoId: null as any });
+  const dayMap: Record<string, number> = { Lun: 1, Mar: 2, Mie: 3, Jue: 4, Vie: 5 };
+  const numToDay = (n: number) => (n >= 1 && n <= 5 ? ['Lun', 'Mar', 'Mie', 'Jue', 'Vie'][n - 1] : 'Lun');
 
   const load = async () => {
     setLoading(true);
     try {
-      const h = await horariosService.getAll();
-      setHorarios(Array.isArray(h) ? h : []);
-      const c = await cursosService.getByUsuario(user?.id || 0);
-      setCursos(Array.isArray(c) ? c : []);
+      if (!user) {
+        setHorarios([]);
+        setCursos([]);
+        setActiveMap({});
+        setLoading(false);
+        return;
+      }
+
+      const c = await cursosService.getByUsuario(user.id);
+      const cursosList = Array.isArray(c) ? c : [];
+      setCursos(cursosList);
+      const s = await courseState.getStates();
+      const map: Record<string, boolean> = {};
+      Object.keys(s).forEach((k) => (map[k] = !!s[k].active));
+      setActiveMap(map);
+
+      const activeCursoIds = cursosList.map((cu: any) => cu.id).filter((id: any) => map[String(id)] !== false);
+      const horariosLists = await Promise.all(activeCursoIds.map((cid: number) => horariosService.getByCurso(cid)));
+      const horariosAll = horariosLists
+        .flat()
+        .filter(Boolean)
+        .map((item: any) => ({
+          ...item,
+          dia: item.dia || (item.diaSemana ? numToDay(item.diaSemana) : undefined),
+          horaInicio: item.horaInicio || item.hora_inicio,
+          horaFin: item.horaFin || item.hora_fin,
+        }));
+      setHorarios(horariosAll);
     } catch (e) {
       showMessage('Error', 'No se pudo cargar el horario');
     }
@@ -31,13 +64,23 @@ export default function HorariosScreen() {
     load();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [])
+  );
+
   const openCreate = () => {
-    setForm({ id: null, dia: 'Lun', horaInicio: '08:00', horaFin: '09:30', aula: '', cursoId: cursos[0]?.id || null });
+    const firstActive = cursos.find((c) => activeMap[String(c.id)] !== false);
+    setForm({ id: null, dia: 'Lun', horaInicio: '08:00', horaFin: '09:30', aula: '', cursoId: firstActive?.id || cursos[0]?.id || null });
     setModalVisible(true);
   };
 
   const openEdit = (item: any) => {
-    setForm({ id: item.id, dia: item.dia || 'Lun', horaInicio: item.horaInicio || '08:00', horaFin: item.horaFin || '09:30', aula: item.aula || '', cursoId: item.curso?.id || null });
+    const diaStr = item.dia || (item.diaSemana ? numToDay(item.diaSemana) : 'Lun');
+    const hInicio = item.horaInicio || item.hora_inicio || '08:00';
+    const hFin = item.horaFin || item.hora_fin || '09:30';
+    setForm({ id: item.id, dia: diaStr, horaInicio: hInicio, horaFin: hFin, aula: item.aula || '', cursoId: item.curso?.id || null });
     setModalVisible(true);
   };
 
@@ -45,11 +88,12 @@ export default function HorariosScreen() {
     if (!form.cursoId) return showMessage('Error', 'Selecciona una materia');
     setLoading(true);
     try {
+      const diaSemanaVal = dayMap[form.dia] || 1;
       if (form.id) {
-        await horariosService.update(form.id, { dia: form.dia, horaInicio: form.horaInicio, horaFin: form.horaFin, aula: form.aula });
+        await horariosService.update(form.id, { diaSemana: diaSemanaVal, horaInicio: form.horaInicio, horaFin: form.horaFin, aula: form.aula });
         showMessage('Éxito', 'Horario actualizado');
       } else {
-        await horariosService.create(form.cursoId, { dia: form.dia, horaInicio: form.horaInicio, horaFin: form.horaFin, aula: form.aula });
+        await horariosService.create(form.cursoId, { diaSemana: diaSemanaVal, horaInicio: form.horaInicio, horaFin: form.horaFin, aula: form.aula });
         showMessage('Éxito', 'Horario creado');
       }
       setModalVisible(false);
@@ -83,12 +127,9 @@ export default function HorariosScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f3f6fb' }}>
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: (insets.bottom || 0) + 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: 22, fontWeight: '700', marginBottom: 12 }}>Horario</Text>
-          <TouchableOpacity onPress={openCreate} style={{ backgroundColor: '#3b82f6', padding: 8, borderRadius: 8 }}>
-            <Text style={{ color: '#fff' }}>Nuevo</Text>
-          </TouchableOpacity>
         </View>
         {loading ? <ActivityIndicator /> : null}
         {days.map((d) => (
@@ -106,12 +147,12 @@ export default function HorariosScreen() {
                       <Text style={{ color: '#6b7280' }}>{h.horaInicio} - {h.horaFin} · {h.aula}</Text>
                     </View>
                     <View>
-                      <TouchableOpacity onPress={() => openEdit(h)}>
-                        <Text style={{ color: '#3b82f6' }}>Editar</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleDelete(h.id)}>
-                        <Text style={{ color: '#ef4444', marginTop: 6 }}>Eliminar</Text>
-                      </TouchableOpacity>
+                        <TouchableOpacity onPress={() => openEdit(h)} hitSlop={{ top: 28, bottom: 28, left: 28, right: 28 }} activeOpacity={0.8}>
+                          <Text style={{ color: '#3b82f6' }}>Editar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDelete(h.id)} hitSlop={{ top: 28, bottom: 28, left: 28, right: 28 }} activeOpacity={0.8}>
+                          <Text style={{ color: '#ef4444', marginTop: 6 }}>Eliminar</Text>
+                        </TouchableOpacity>
                     </View>
                   </View>
                 ))
@@ -136,7 +177,7 @@ export default function HorariosScreen() {
               <TextInput placeholder="Aula" value={form.aula} onChangeText={(t) => setForm({ ...form, aula: t })} style={styles.input} />
               <Text style={{ marginTop: 8, marginBottom: 6 }}>Materia</Text>
               <View style={{ maxHeight: 120 }}>
-                <FlatList data={cursos} keyExtractor={(i: any) => String(i.id)} renderItem={({ item }) => (
+                <FlatList data={cursos.filter((c) => activeMap[String(c.id)] !== false)} keyExtractor={(i: any) => String(i.id)} renderItem={({ item }) => (
                   <TouchableOpacity onPress={() => setForm({ ...form, cursoId: item.id })} style={{ padding: 8, backgroundColor: form.cursoId === item.id ? '#eef2ff' : 'transparent' }}>
                     <Text>{item.nombre}</Text>
                   </TouchableOpacity>
@@ -154,12 +195,13 @@ export default function HorariosScreen() {
           </View>
         </Modal>
       </ScrollView>
+      <FloatingButton onPress={openCreate} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16 },
+  modalCard: { backgroundColor: theme.card, borderRadius: theme.radius, padding: 16, shadowColor: theme.shadowColor, shadowOpacity: theme.shadowOpacity, shadowRadius: theme.shadowRadius, elevation: theme.elevation },
   input: { borderWidth: 1, borderColor: '#e6edf5', padding: 10, borderRadius: 10, marginTop: 8 },
 });

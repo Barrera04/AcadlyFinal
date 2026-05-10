@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useNavigation } from '@react-navigation/native';
 import { showMessage } from '../utils/notify';
 import { theme } from '../styles/theme';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const navigation: any = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,6 +20,7 @@ export default function LoginScreen() {
       const res: any = await login(email, password);
       if (res?.success) {
         showMessage('Éxito', 'Has iniciado sesión');
+        setLoading(false);
         return;
       }
       const err = res?.error || 'Credenciales inválidas';
@@ -42,8 +45,14 @@ export default function LoginScreen() {
         <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Entrar</Text>}
         </TouchableOpacity>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 12 }}>
+            <Text style={{ color: '#6b7280' }}>¿No tienes cuenta? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+              <Text style={{ color: theme.primary, fontWeight: '700' }}>Regístrate</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
-    </View>
   );
 }
 

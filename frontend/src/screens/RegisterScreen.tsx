@@ -2,18 +2,38 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { showMessage } from '../utils/notify';
+import { useNavigation } from '@react-navigation/native';
 
 export default function RegisterScreen() {
   const { register, login } = useAuth();
+  const navigation: any = useNavigation();
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const passwordValid = password.length >= 8;
+
   const handleRegister = async () => {
-    setLoading(true);
     setError(null);
+    // validate password length
+    if (!passwordValid) {
+      const msg = 'La contraseña debe tener al menos 8 caracteres';
+      setError(msg);
+      showMessage('Error', msg);
+      return;
+    }
+    // validate passwords match before sending
+    if (password !== confirmPassword) {
+      const msg = 'Las contraseñas no coinciden';
+      setError(msg);
+      showMessage('Error', msg);
+      return;
+    }
+
+    setLoading(true);
     try {
       const res: any = await register(nombre, email, password);
       if (res?.success) {
@@ -45,10 +65,18 @@ export default function RegisterScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <TextInput style={styles.input} placeholder="Nombre" value={nombre} onChangeText={setNombre} />
         <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize='none' keyboardType='email-address' />
-        <TextInput style={styles.input} placeholder="Contraseña" secureTextEntry value={password} onChangeText={setPassword} />
-        <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
+        <TextInput style={styles.input} placeholder="Contraseña" secureTextEntry value={password} onChangeText={(t) => { setError(null); setPassword(t); }} />
+        {!passwordValid && password ? <Text style={styles.error}>La contraseña debe tener al menos 8 caracteres</Text> : null}
+        <TextInput style={styles.input} placeholder="Confirmar contraseña" secureTextEntry value={confirmPassword} onChangeText={(t) => { setError(null); setConfirmPassword(t); }} />
+        <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading || !nombre || !email || !password || !confirmPassword || password !== confirmPassword}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Registrarse</Text>}
         </TouchableOpacity>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 12 }}>
+          <Text style={{ color: '#6b7280' }}>¿Ya tienes cuenta? </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+            <Text style={{ color: '#3b82f6', fontWeight: '700' }}>Inicia sesión</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );

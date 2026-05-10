@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { ActivityIndicator, View } from 'react-native';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -45,6 +46,14 @@ function MainTabs() {
 
 function RootNavigator() {
   const { user } = useAuth();
+  const { loading } = useAuth();
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>

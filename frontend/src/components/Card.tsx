@@ -1,10 +1,19 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { theme } from '../styles/theme';
 
 export default function Card({ children, style }: any) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 14, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 4 },
+  card: {
+    backgroundColor: theme.card,
+    borderRadius: theme.radius,
+    padding: 14,
+    shadowColor: theme.shadowColor,
+    shadowOpacity: theme.shadowOpacity,
+    shadowRadius: theme.shadowRadius,
+    elevation: theme.elevation,
+  },
 });

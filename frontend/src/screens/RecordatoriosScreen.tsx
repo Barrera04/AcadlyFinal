@@ -1,10 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
 import Card from '../components/Card';
 import * as recordatoriosService from '../services/recordatoriosService';
 import * as tareasService from '../services/tareasService';
+import * as cursosService from '../services/cursosService';
 import { useAuth } from '../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
 import { showMessage } from '../utils/notify';
+import { theme } from '../styles/theme';
+import FloatingButton from '../components/FloatingButton';
 
 export default function RecordatoriosScreen() {
   const { user } = useAuth();
@@ -17,10 +21,23 @@ export default function RecordatoriosScreen() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await recordatoriosService.getAll();
-      setRecordatorios(Array.isArray(r) ? r : []);
-      const t = await tareasService.getAll();
-      setTareas(Array.isArray(t) ? t : []);
+      if (!user) {
+        setRecordatorios([]);
+        setTareas([]);
+        setLoading(false);
+        return;
+      }
+
+      // load user's cursos -> tareas -> recordatorios so we only show current user's data
+      const c = await cursosService.getByUsuario(user.id);
+      const cursosList = Array.isArray(c) ? c : [];
+      const tareasLists = await Promise.all(cursosList.map((cu: any) => tareasService.getByCurso(cu.id)));
+      const tareasAll = tareasLists.flat().filter(Boolean);
+      setTareas(tareasAll);
+
+      const recordatoriosLists = await Promise.all(tareasAll.map((t: any) => recordatoriosService.getByTarea(t.id)));
+      const recordatoriosAll = recordatoriosLists.flat().filter(Boolean);
+      setRecordatorios(recordatoriosAll);
     } catch (e) {
       showMessage('Error', 'No se pudieron cargar recordatorios');
     }
@@ -29,7 +46,13 @@ export default function RecordatoriosScreen() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [user])
+  );
 
   const openCreate = () => {
     setForm({ id: null, mensaje: '', fecha: '', tareaId: tareas[0]?.id || null });
@@ -95,9 +118,6 @@ export default function RecordatoriosScreen() {
       <View style={{ padding: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: 22, fontWeight: '700', marginBottom: 12 }}>Recordatorios</Text>
-          <TouchableOpacity onPress={openCreate} style={{ backgroundColor: '#3b82f6', padding: 8, borderRadius: 8 }}>
-            <Text style={{ color: '#fff' }}>Nuevo</Text>
-          </TouchableOpacity>
         </View>
         {loading ? <ActivityIndicator /> : null}
         <FlatList
@@ -110,15 +130,15 @@ export default function RecordatoriosScreen() {
                   <Text style={{ fontWeight: '700' }}>{item.mensaje}</Text>
                   <Text style={{ color: '#6b7280', marginTop: 6 }}>{item.fecha}</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end' }}>
+                  <View style={{ alignItems: 'flex-end' }}>
                   <Text style={{ color: item.enviado ? '#10b981' : '#f59e0b' }}>{item.enviado ? 'Enviado' : 'Pendiente'}</Text>
-                  <TouchableOpacity onPress={() => toggleEnviado(item)}>
+                  <TouchableOpacity onPress={() => toggleEnviado(item)} hitSlop={{ top: 28, bottom: 28, left: 28, right: 28 }} activeOpacity={0.8}>
                     <Text style={{ color: '#3b82f6', marginTop: 6 }}>{item.enviado ? 'Marcar pendiente' : 'Marcar enviado'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => openEdit(item)}>
+                  <TouchableOpacity onPress={() => openEdit(item)} hitSlop={{ top: 28, bottom: 28, left: 28, right: 28 }} activeOpacity={0.8}>
                     <Text style={{ color: '#3b82f6', marginTop: 6 }}>Editar</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDelete(item.id)}>
+                  <TouchableOpacity onPress={() => handleDelete(item.id)} hitSlop={{ top: 28, bottom: 28, left: 28, right: 28 }} activeOpacity={0.8}>
                     <Text style={{ color: '#ef4444', marginTop: 6 }}>Eliminar</Text>
                   </TouchableOpacity>
                 </View>
@@ -154,12 +174,13 @@ export default function RecordatoriosScreen() {
           </View>
         </Modal>
       </View>
+      <FloatingButton onPress={openCreate} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16 },
+  modalCard: { backgroundColor: theme.card, borderRadius: theme.radius, padding: 16, shadowColor: theme.shadowColor, shadowOpacity: theme.shadowOpacity, shadowRadius: theme.shadowRadius, elevation: theme.elevation },
   input: { borderWidth: 1, borderColor: '#e6edf5', padding: 10, borderRadius: 10, marginTop: 8 },
 });

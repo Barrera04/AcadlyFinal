@@ -1,6 +1,18 @@
 export const theme = {
   primary: '#3b82f6',
+  primaryDark: '#2563eb',
+  accent: '#f59e0b',
+  success: '#10b981',
+  danger: '#ef4444',
   lightBlue: '#eef6ff',
   bg: '#f3f6fb',
   card: '#ffffff',
+  text: '#1f2937',
+  muted: '#6b7280',
+  radius: 12,
+  shadowColor: '#000',
+  shadowOpacity: 0.06,
+  shadowRadius: 12,
+  elevation: 4,
+  touchSize: 100,
 };
