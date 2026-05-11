@@ -1,4 +1,4 @@
-export const API_BASE = 'http://192.168.1.12:8080'; // On emulator use 10.0.2.2; change to backend IP as needed
+export const API_BASE = 'http://192.168.137.142:8080'; // On emulator use 10.0.2.2; change to backend IP as needed
 
 async function request(path: string, options: RequestInit = {}) {
   const url = `${API_BASE}${path}`;

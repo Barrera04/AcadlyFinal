@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import { theme } from '../styles/theme';
 import Card from '../components/Card';
 import QuickAction from '../components/QuickAction';
+import Badge from '../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import * as tareasService from '../services/tareasService';
@@ -24,7 +25,6 @@ export default function HomeScreen() {
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        // load user's cursos and their tareas to compute counts and next task
         const cursos = await cursosService.getByUsuario(user?.id || 0);
         const cursoIds = Array.isArray(cursos) ? cursos.map((c: any) => c.id) : [];
         const states = await courseState.getStates();
@@ -33,15 +33,11 @@ export default function HomeScreen() {
         const tareasLists = await Promise.all(activeCursoIds.map((cid: number) => tareasService.getByCurso(cid)));
         const tareasAll = tareasLists.flat().filter(Boolean);
 
-        // compute counts
         const pending = tareasAll.filter((x: any) => x.estado !== 'completada');
         const done = tareasAll.filter((x: any) => x.estado === 'completada');
         setPendingCount(pending.length);
         setDoneCount(done.length);
 
-        // find next upcoming by fechaLimite
-        // Normalize to date-only (ignore time) so a task due today counts
-        // and exclude tasks already completed
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const upcoming = tareasAll
@@ -61,52 +57,151 @@ export default function HomeScreen() {
       }
     };
 
-    // initial load and reload whenever screen gains focus
     loadDashboard();
     const unsubscribe = navigation.addListener('focus', loadDashboard);
     return unsubscribe;
   }, [navigation, user]);
 
+  const progressPercent = pendingCount + doneCount > 0 ? Math.round((doneCount / (pendingCount + doneCount)) * 100) : 0;
+  const daysUntilDeadline = nextTask
+    ? Math.ceil((new Date(nextTask.fechaLimite || nextTask.fecha).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
   return (
     <View style={{ flex: 1 }}>
       <Header nombre={user?.nombre || 'Usuario'} />
-      <ScrollView style={[styles.container, { backgroundColor: theme.bg }]} contentContainerStyle={{ padding: 16, paddingBottom: (insets.bottom || 0) + 16 }}>
-        <Card style={{ marginBottom: 16 }}>
-          <Text style={{ fontWeight: '700', fontSize: 16, marginBottom: 8 }}>Próxima tarea</Text>
-          {nextTask ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View>
-                <Text style={{ fontWeight: '600' }}>{nextTask.titulo || 'Sin título'}</Text>
-                <Text style={{ color: '#6b7280', marginTop: 6 }}>{nextTask.curso?.nombre || 'Sin materia'}</Text>
+      <ScrollView
+        style={[styles.container]}
+        contentContainerStyle={{
+          padding: theme.spacing.lg,
+          paddingBottom: (insets.bottom || 0) + theme.spacing.lg,
+        }}
+        scrollIndicatorInsets={{ right: 1 }}
+      >
+        {/* Next Task Section */}
+        {nextTask ? (
+          <Card variant="elevated" padding="lg" style={{ marginBottom: theme.spacing.xl }}>
+            <View style={{ marginBottom: theme.spacing.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.md }}>
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: theme.radius.lg,
+                    backgroundColor: theme.lightBlue,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Ionicons name="checkmark-circle" size={24} color={theme.primary} />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 13, color: theme.textSecondary, fontWeight: '600' }}>PRÓXIMA TAREA</Text>
+                </View>
               </View>
-              <Text style={{ color: '#6b7280' }}>{(nextTask.fechaLimite || nextTask.fecha || '').toString().split('T')[0] || ''}</Text>
-            </View>
-          ) : (
-            <Text style={{ color: '#6b7280' }}>No hay tareas próximas</Text>
-          )}
-        </Card>
 
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-          <QuickAction icon={<Ionicons name="add" size={20} color="#3b82f6" />} label="Agregar tarea" onPress={() => navigation.navigate('Tareas', { openCreate: true })} />
-          <QuickAction icon={<Ionicons name="book" size={20} color="#3b82f6" />} label="Ver materias" onPress={() => navigation.navigate('Materias')} />
-          <QuickAction icon={<Ionicons name="calendar" size={20} color="#3b82f6" />} label="Ver horario" onPress={() => navigation.navigate('Horario')} />
+              <Text style={{ fontSize: 20, fontWeight: '700', color: theme.text, marginBottom: theme.spacing.sm }}>
+                {nextTask.titulo || 'Sin título'}
+              </Text>
+
+              <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: theme.spacing.md }}>
+                {nextTask.curso?.nombre || 'Sin materia'}
+              </Text>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: theme.textTertiary }}>
+                  {(nextTask.fechaLimite || nextTask.fecha || '').toString().split('T')[0] || ''}
+                </Text>
+                {daysUntilDeadline !== null && (
+                  <Badge
+                    label={daysUntilDeadline <= 1 ? 'Hoy' : daysUntilDeadline <= 3 ? `En ${daysUntilDeadline} días` : `En ${daysUntilDeadline} días`}
+                    variant={daysUntilDeadline <= 1 ? 'danger' : daysUntilDeadline <= 3 ? 'warning' : 'info'}
+                    size="sm"
+                  />
+                )}
+              </View>
+            </View>
+          </Card>
+        ) : (
+          <Card variant="outlined" padding="lg" style={{ marginBottom: theme.spacing.xl }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+              <Ionicons name="checkmark-done" size={28} color={theme.success} />
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.success }}>¡Excelente!</Text>
+                <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: theme.spacing.sm }}>No hay tareas próximas</Text>
+              </View>
+            </View>
+          </Card>
+        )}
+
+        {/* Stats Section */}
+        <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginBottom: theme.spacing.xl }}>
+          <Card variant="default" padding="lg" style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, color: theme.textSecondary, fontWeight: '600', marginBottom: theme.spacing.md }}>PENDIENTES</Text>
+            <Text style={{ fontSize: 32, fontWeight: '700', color: theme.primary, marginBottom: theme.spacing.sm }}>
+              {pendingCount}
+            </Text>
+            <View style={{ width: '100%', height: 4, backgroundColor: theme.bg, borderRadius: theme.radius.full, overflow: 'hidden' }}>
+              <View
+                style={{
+                  width: `${Math.min(pendingCount * 25, 100)}%`,
+                  height: '100%',
+                  backgroundColor: theme.primary,
+                  borderRadius: theme.radius.full,
+                }}
+              />
+            </View>
+          </Card>
+
+          <Card variant="default" padding="lg" style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, color: theme.textSecondary, fontWeight: '600', marginBottom: theme.spacing.md }}>COMPLETADAS</Text>
+            <Text style={{ fontSize: 32, fontWeight: '700', color: theme.success, marginBottom: theme.spacing.sm }}>
+              {doneCount}
+            </Text>
+            <View style={{ width: '100%', height: 4, backgroundColor: theme.bg, borderRadius: theme.radius.full, overflow: 'hidden' }}>
+              <View
+                style={{
+                  width: `${progressPercent}%`,
+                  height: '100%',
+                  backgroundColor: theme.success,
+                  borderRadius: theme.radius.full,
+                }}
+              />
+            </View>
+          </Card>
         </View>
 
-        <Card style={{ marginBottom: 16 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontWeight: '700' }}>Pendientes: <Text style={{ color: '#3b82f6' }}>{pendingCount}</Text></Text>
-            <Text style={{ color: '#10b981' }}>Hechas: <Text style={{ color: '#10b981' }}>{doneCount}</Text></Text>
+        {/* Quick Actions */}
+        <View style={{ marginBottom: theme.spacing.xl }}>
+          <Text style={{ fontSize: 13, color: theme.textSecondary, fontWeight: '600', marginBottom: theme.spacing.lg }}>ACCESOS RÁPIDOS</Text>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+            <QuickAction
+              icon={<Ionicons name="add-circle" size={28} color={theme.primary} />}
+              label="Nueva tarea"
+              onPress={() => navigation.navigate('Tareas', { openCreate: true })}
+            />
+            <QuickAction
+              icon={<Ionicons name="book" size={28} color={theme.primary} />}
+              label="Materias"
+              onPress={() => navigation.navigate('Materias')}
+            />
+            <QuickAction
+              icon={<Ionicons name="calendar" size={28} color={theme.primary} />}
+              label="Horario"
+              onPress={() => navigation.navigate('Horario')}
+            />
           </View>
-        </Card>
+        </View>
 
-        <Card>
-          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#fffbeb', justifyContent: 'center', alignItems: 'center' }}>
-              <Ionicons name="bulb" size={22} color="#f59e0b" />
-            </View>
+        {/* Motivational Card */}
+        <Card variant="elevated" padding="lg" style={{ backgroundColor: theme.accentLight, borderLeftWidth: 4, borderLeftColor: theme.accent }}>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.lg, alignItems: 'flex-start' }}>
+            <Text style={{ fontSize: 32 }}>✨</Text>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: '700' }}>Un paso a la vez</Text>
-              <Text style={{ color: '#6b7280' }}>también es progreso.</Text>
+              <Text style={{ fontWeight: '700', fontSize: 16, color: theme.text, marginBottom: theme.spacing.sm }}>Mantén el ritmo</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 20 }}>
+                Cada tarea completada es un paso hacia tus metas. ¡Tú puedes!
+              </Text>
             </View>
           </View>
         </Card>
@@ -116,5 +211,8 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f3f6fb' },
+  container: {
+    flex: 1,
+    backgroundColor: theme.bg,
+  },
 });
