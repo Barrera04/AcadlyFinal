@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as authService from '../services/authService';
+import useFirebaseEmailVerification from '../hooks/useFirebaseEmailVerification';
 
 type User = { id: number; nombre: string; email: string } | null;
 
@@ -10,6 +11,7 @@ export const AuthProvider = ({ children }: any) => {
   const [user, setUser] = useState<User>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { checkWithCredentials } = useFirebaseEmailVerification();
 
   useEffect(() => {
     (async () => {
@@ -28,6 +30,16 @@ export const AuthProvider = ({ children }: any) => {
     console.log('AuthContext.login response', res);
     // Backend may return either { token, user } or directly the user object.
     if (res?.token) {
+      // Antes de guardar sesión, verificar email via Firebase
+      try {
+        const check = await checkWithCredentials(email, password);
+        if (!check.verified) {
+          return { success: false, needsVerification: true, error: 'Correo no verificado' };
+        }
+      } catch (e) {
+        console.warn('[AuthContext] firebase check threw; treating as not verified', e);
+        return { success: false, needsVerification: true, error: 'Correo no verificado' };
+      }
       const userSafe = { ...res.user };
       if (userSafe.password) delete userSafe.password;
       await AsyncStorage.setItem('token', res.token);
@@ -38,6 +50,16 @@ export const AuthProvider = ({ children }: any) => {
     }
     if (res?.id || res?.email) {
       // treat direct user object as successful login (no token provided)
+      // Also enforce verification check
+      try {
+        const check = await checkWithCredentials(email, password);
+        if (!check.verified) {
+          return { success: false, needsVerification: true, error: 'Correo no verificado' };
+        }
+      } catch (e) {
+        console.warn('[AuthContext] firebase check threw; treating as not verified', e);
+        return { success: false, needsVerification: true, error: 'Correo no verificado' };
+      }
       const userSafe = { ...res };
       if (userSafe.password) delete userSafe.password;
       await AsyncStorage.removeItem('token');

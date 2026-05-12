@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import useFirebaseEmailVerification from '../hooks/useFirebaseEmailVerification';
 import { showMessage } from '../utils/notify';
 import { useNavigation } from '@react-navigation/native';
 
 export default function RegisterScreen() {
   const { register, login } = useAuth();
   const navigation: any = useNavigation();
+  const { createTempUserAndSendVerification } = useFirebaseEmailVerification();
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +40,19 @@ export default function RegisterScreen() {
       const res: any = await register(nombre, email, password);
       if (res?.success) {
         showMessage('Éxito', 'Cuenta creada correctamente');
-        // auto-login after register
+        // Crear usuario temporal en Firebase y enviar verificación
+        try {
+          const fb = await createTempUserAndSendVerification(email, password);
+          if (fb?.success) {
+            // Navegar a pantalla de verificación
+            navigation.navigate('VerifyEmail', { email });
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('[Register] firebase create/send failed', e);
+        }
+        // fallback: auto-login after register
         try {
           await login(email, password);
         } catch (e) {

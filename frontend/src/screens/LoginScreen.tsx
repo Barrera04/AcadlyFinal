@@ -23,6 +23,12 @@ export default function LoginScreen() {
         setLoading(false);
         return;
       }
+      if (res?.needsVerification) {
+        showMessage('Info', 'Debes verificar tu correo antes de iniciar sesión');
+        setLoading(false);
+        navigation.navigate('VerifyEmail', { email });
+        return;
+      }
       const err = res?.error || 'Credenciales inválidas';
       setError(err);
       showMessage('Error', err);
