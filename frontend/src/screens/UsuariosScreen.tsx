@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
 import Card from '../components/Card';
+import ProfilePhoto from '../components/ProfilePhoto';
 import * as usuariosService from '../services/usuariosService';
 import { showMessage } from '../utils/notify';
 import { theme } from '../styles/theme';
@@ -113,10 +114,8 @@ export default function UsuariosScreen() {
             const initials = (profile.nombre || 'U').split(' ').map((s: string) => s[0]).join('').slice(0, 2).toUpperCase();
             return (
               <Card style={{ marginBottom: 12, padding: 20, alignItems: 'center' }}>
-                <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                  <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>{initials}</Text>
-                </View>
-                <Text style={{ fontSize: 20, fontWeight: '700' }}>{profile.nombre}</Text>
+                <ProfilePhoto size={96} />
+                <Text style={{ fontSize: 20, fontWeight: '700', marginTop: 12 }}>{profile.nombre}</Text>
                 <Text style={{ color: theme.muted, marginTop: 6 }}>{profile.email}</Text>
                 <View style={{ flexDirection: 'row', marginTop: 16 }}>
                   <TouchableOpacity onPress={() => openEdit(profile)} style={{ backgroundColor: '#3b82f6', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginRight: 8 }}>
@@ -159,6 +158,9 @@ export default function UsuariosScreen() {
           <View style={styles.modalWrap}>
             <View style={styles.modalCard}>
               <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 8 }}>{form.id ? 'Editar Usuario' : 'Nuevo Usuario'}</Text>
+              <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                <ProfilePhoto size={80} />
+              </View>
               <TextInput placeholder="Nombre" value={form.nombre} onChangeText={(t) => setForm({ ...form, nombre: t })} style={styles.input} />
               <TextInput placeholder="Email" value={form.email} onChangeText={(t) => setForm({ ...form, email: t })} style={styles.input} />
               {!form.id && <TextInput placeholder="Password" secureTextEntry value={form.password} onChangeText={(t) => setForm({ ...form, password: t })} style={styles.input} />}
