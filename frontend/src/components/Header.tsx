@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { theme } from '../styles/theme';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import useProfilePhotoUri from '../hooks/useProfilePhotoUri';
 
 interface HeaderProps {
   nombre?: string;
@@ -18,6 +19,7 @@ export default function Header({
 }: HeaderProps) {
   const navigation: any = useNavigation();
   const insets = useSafeAreaInsets();
+  const { uri } = useProfilePhotoUri();
   const initials = (nombre || 'U')
     .split(' ')
     .map((s) => s[0])
@@ -55,10 +57,21 @@ export default function Header({
           hitSlop={{ top: 28, bottom: 28, left: 28, right: 28 }}
           activeOpacity={0.7}
         >
-          <Text style={styles.avatarText}>{initials}</Text>
-          <View style={styles.avatarBadge}>
-            <Ionicons name="checkmark" size={10} color="#fff" />
-          </View>
+          {uri ? (
+            <>
+              <Image source={{ uri }} style={styles.avatarImage} />
+              <View style={styles.avatarBadge}>
+                <Ionicons name="checkmark" size={10} color="#fff" />
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.avatarText}>{initials}</Text>
+              <View style={styles.avatarBadge}>
+                <Ionicons name="checkmark" size={10} color="#fff" />
+              </View>
+            </>
+          )}
         </TouchableOpacity>
       )}
     </View>
@@ -101,6 +114,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 16,
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: theme.radius.full,
+    resizeMode: 'cover',
   },
   avatarBadge: {
     position: 'absolute',
